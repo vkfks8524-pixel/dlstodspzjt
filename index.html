@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>인생네컷</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+    :root {
+      --bg-color: #0a0a0a;
+      --text-color: #f4f4f4;
+      --accent: #ffffff;
+      --border: rgba(255, 255, 255, 0.15);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Pretendard', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+      font-weight: 300;
+    }
+
+    .screen {
+      display: none;
+      width: 100%;
+      max-width: 500px;
+      min-height: 100vh;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      box-sizing: border-box;
+      animation: fadeIn 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      letter-spacing: 6px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    p.desc {
+      font-size: 0.8rem;
+      color: #777;
+      letter-spacing: 1px;
+      line-height: 1.6;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      font-weight: 400;
+      letter-spacing: 2px;
+      margin-bottom: 30px;
+      text-transform: uppercase;
+      color: #bbb;
+    }
+
+    /* Button System */
+    button {
+      background: transparent;
+      color: var(--text-color);
+      border: 1px solid var(--border);
+      padding: 18px 32px;
+      font-size: 0.8rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      width: 100%;
+      max-width: 320px;
+      margin-bottom: 12px;
+      transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--text-color);
+      color: var(--bg-color);
+      border-color: var(--text-color);
+    }
+
+    button:disabled {
+      opacity: 0.2;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background: var(--text-color);
+      color: var(--bg-color);
+    }
+
+    /* Camera Container */
+    #video-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      aspect-ratio: 3/4;
+      background: #000;
+      border: 1px solid var(--border);
+      margin-bottom: 30px;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    #ui-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      box-sizing: border-box;
+      pointer-events: none;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      color: #fff;
+    }
+
+    .blinking-rec {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rec-dot {
+      width: 6px;
+      height: 6px;
+      background-color: #ff0000;
+      border-radius: 50%;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    #countdown {
+      position: absolute;
+      top: 15px; /* 타이머 상단으로 조정 */
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 5rem;
+      font-weight: 200;
+      color: white;
+      text-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      margin: 0;
+    }
+
+    /* Gallery Grid */
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 40px;
+    }
+
+    /* 갤러리 기본 컬러 및 투명도 100% */
+    .gallery img {
+      width: 100%;
+      aspect-ratio: 3/4;
+      object-fit: cover;
+      cursor: pointer;
+      opacity: 1; 
+      transition: all 0.3s ease;
+      filter: none; 
+      border: 2px solid transparent; 
+      box-sizing: border-box;
+    }
+
+    /* 선택된 이미지만 시각적 강조 */
+    .gallery img.selected {
+      border-color: var(--accent);
+      transform: scale(0.95);
+      box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+    }
+
+    /* Live Preview Screen Specific */
+    #preview-canvas-display {
+      max-width: 240px;
+      height: auto;
+      border: 1px solid var(--border);
+      margin-bottom: 25px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      transition: filter 0.3s ease;
+    }
+
+    /* 컬러/흑백 전환 필터 토글 */
+    .filter-toggle {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 25px;
+      width: 100%;
+      max-width: 240px;
+    }
+
+    .filter-toggle button {
+      margin-bottom: 0;
+      padding: 12px 0;
+      flex: 1;
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      border-color: var(--border);
+      color: #888;
+    }
+
+    .filter-toggle button.active {
+      border-color: var(--text-color);
+      color: var(--text-color);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .color-swatch-container {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .color-swatch {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: transform 0.3s ease;
+    }
+
+    .color-swatch:hover {
+      transform: scale(1.2);
+    }
+
+    .color-swatch.active {
+      border: 2px solid #fff;
+    }
+
+    /* Final Result */
+    #final-result-img {
+      max-width: 240px;
+      border: 1px solid var(--border);
+      margin-bottom: 30px;
+    }
+
+    .flash-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="screen-start" class="screen active">
+    <h1>인생네컷</h1>
+    <p class="desc">Self Portrait Studio<br>10 Captures / 10 Sec Interval / Timelapse</p>
+    <button class="primary" onclick="initCamera()">Start Capture</button>
+  </div>
+
+  <div id="screen-camera" class="screen">
+    <div id="video-container">
+      <video id="camera-video" autoplay playsinline muted></video>
+      <div id="ui-overlay">
+        <div class="status-bar">
+          <div class="blinking-rec">
+            <div class="rec-dot"></div>
+            <span>REC</span>
+          </div>
+          <span id="shot-count">01 / 10</span>
+        </div>
+        <div id="countdown">10</div>
+      </div>
+      <div id="flash" class="flash-overlay"></div>
+    </div>
+    <canvas id="capture-canvas" style="display:none;"></canvas>
+  </div>
+
+  <div id="screen-select" class="screen">
+    <h2>Select 4 Frames</h2>
+    <div class="gallery" id="photo-gallery"></div>
+    <button id="btn-confirm-select" class="primary" disabled onclick="moveToPreview()">Next Step</button>
+  </div>
+
+  <div id="screen-preview" class="screen">
+    <h2>Customize Frame</h2>
+    <canvas id="preview-canvas-display"></canvas>
+    
+    <div class="filter-toggle">
+      <button id="btn-filter-color" class="active" onclick="updatePreviewFilter(false)">Color</button>
+      <button id="btn-filter-bw" onclick="updatePreviewFilter(true)">B&W</button>
+    </div>
+    
+    <div class="color-swatch-container">
+      <div class="color-swatch" style="background: #000000;" onclick="updatePreviewColor('#000000')"></div>
+      <div class="color-swatch" style="background: #ffffff;" onclick="updatePreviewColor('#ffffff')"></div>
+      <div class="color-swatch" style="background: #e5e5e5;" onclick="updatePreviewColor('#e5e5e5')"></div>
+      <div class="color-swatch" style="background: #1a1a1a;" onclick="updatePreviewColor('#1a1a1a')"></div>
+    </div>
+
+    <button class="primary" onclick="moveToResult()">Finalize</button>
+    <button onclick="showScreen('screen-select')">Back</button>
+  </div>
+
+  <div id="screen-result" class="screen">
+    <h1>Archive</h1>
+    <p class="desc">Archive Completed</p>
+    <img id="final-result-img" src="" alt="Result">
+    
+    <button onclick="downloadImage()">Save Picture</button>
+    <button onclick="downloadVideo()">Save Video</button>
+    <button onclick="location.reload()" style="margin-top: 20px; border-color: transparent; color: #555;">Restart</button>
+  </div>
+
+  <script>
+    let stream;
+    let mediaRecorder;
+    let videoChunks = [];
+    let videoBlobUrl = null;
+    let photos = []; 
+    let selectedIndices = []; 
+    let currentFrameColor = "#000000"; 
+    let isGrayscale = false; // 흑백 필터 상태 관리
+    
+    let timerInterval;
+    let currentShot = 0;
+    let timeLeft = 10;
+    
+    const videoEl = document.getElementById('camera-video');
+    const canvasEl = document.getElementById('capture-canvas');
+    const ctx = canvasEl.getContext('2d');
+
+    const previewCanvas = document.getElementById('preview-canvas-display');
+    const previewCtx = previewCanvas.getContext('2d');
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    async function initCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1440 } }, 
+          audio: false 
+        });
+      } catch (err) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch (err2) {
+          alert("Camera access denied.");
+          return;
+        }
+      }
+      
+      videoEl.srcObject = stream;
+      videoEl.onloadedmetadata = () => {
+        canvasEl.width = videoEl.videoWidth;
+        canvasEl.height = videoEl.videoHeight;
+        showScreen('screen-camera');
+        startShootingProcess();
+      };
+    }
+
+    function startShootingProcess() {
+      videoChunks = [];
+      const options = MediaRecorder.isTypeSupported('video/webm; codecs=vp8') 
+                      ? { mimeType: 'video/webm; codecs=vp8' } 
+                      : { mimeType: 'video/mp4' };
+      
+      mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) videoChunks.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        const type = options.mimeType.split(';')[0];
+        const blob = new Blob(videoChunks, { type: type });
+        videoBlobUrl = URL.createObjectURL(blob);
+      };
+      mediaRecorder.start();
+
+      currentShot = 0;
+      timeLeft = 10;
+      updateUITimer();
+      
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+          takePhoto();
+        } else {
+          updateUITimer();
+        }
+      }, 1000);
+    }
+
+    function updateUITimer() {
+      document.getElementById('countdown').innerText = timeLeft;
+      let displayShot = (currentShot + 1).toString().padStart(2, '0');
+      document.getElementById('shot-count').innerText = `${displayShot} / 10`;
+    }
+
+    function takePhoto() {
+      const flash = document.getElementById('flash');
+      flash.style.opacity = '1';
+      setTimeout(() => flash.style.opacity = '0', 100);
+
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(videoEl, -canvasEl.width, 0, canvasEl.width, canvasEl.height);
+      ctx.restore();
+
+      photos.push(canvasEl.toDataURL('image/png'));
+      currentShot++;
+
+      if (currentShot >= 10) {
+        clearInterval(timerInterval);
+        mediaRecorder.stop();
+        stopCamera();
+        buildGallery();
+        showScreen('screen-select');
+      } else {
+        timeLeft = 10;
+        updateUITimer();
+      }
+    }
+
+    function stopCamera() {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+    }
+
+    function buildGallery() {
+      const gallery = document.getElementById('photo-gallery');
+      gallery.innerHTML = '';
+      photos.forEach((src, index) => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.onclick = () => toggleSelection(index, img);
+        gallery.appendChild(img);
+      });
+    }
+
+    function toggleSelection(index, imgEl) {
+      const pos = selectedIndices.indexOf(index);
+      if (pos > -1) {
+        selectedIndices.splice(pos, 1);
+        imgEl.classList.remove('selected');
+      } else {
+        if (selectedIndices.length >= 4) return;
+        selectedIndices.push(index);
+        imgEl.classList.add('selected');
+      }
+      document.getElementById('btn-confirm-select').disabled = (selectedIndices.length !== 4);
+    }
+
+    // 프리뷰 화면으로 이동
+    function moveToPreview() {
+      showScreen('screen-preview');
+      renderStrip(previewCanvas, currentFrameColor);
+    }
+
+    // 배경색 전환
+    function updatePreviewColor(color) {
+      currentFrameColor = color;
+      renderStrip(previewCanvas, color);
+    }
+
+    // 흑백/컬러 필터 전환 함수
+    function updatePreviewFilter(grayscale) {
+      isGrayscale = grayscale;
+      document.getElementById('btn-filter-color').classList.toggle('active', !isGrayscale);
+      document.getElementById('btn-filter-bw').classList.toggle('active', isGrayscale);
+      renderStrip(previewCanvas, currentFrameColor);
+    }
+
+    // 캔버스 프레임 렌더링 함수
+    function renderStrip(targetCanvas, bgColor) {
+      const tCtx = targetCanvas.getContext('2d');
+      const padding = 40;
+      const spacing = 20;
+      const bottomSpace = 180; 
+      
+      const pWidth = 600; 
+      const pHeight = parseInt(canvasEl.height * (pWidth / canvasEl.width)); 
+
+      targetCanvas.width = pWidth + (padding * 2);
+      targetCanvas.height = padding + (pHeight * 4) + (spacing * 3) + bottomSpace;
+
+      // 프레임 배경 칠하기
+      tCtx.fillStyle = bgColor;
+      tCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+
+      let loadedCount = 0;
+      selectedIndices.forEach((photoIndex, i) => {
+        const img = new Image();
+        img.onload = () => {
+          const yPos = padding + (i * (pHeight + spacing));
+          
+          // 사진 렌더링 시 흑백/컬러 필터 적용
+          tCtx.filter = isGrayscale ? 'grayscale(100%)' : 'none';
+          tCtx.drawImage(img, padding, yPos, pWidth, pHeight);
+          tCtx.filter = 'none'; // 프레임 텍스트에 영향 안 가도록 초기화
+          
+          loadedCount++;
+          if (loadedCount === 4) {
+            // 하단 텍스트 디자인
+            tCtx.fillStyle = (bgColor === '#000000' || bgColor === '#1a1a1a') ? '#ffffff' : '#000000';
+            tCtx.font = "300 24px 'Pretendard', sans-serif";
+            tCtx.textAlign = "center";
+            tCtx.letterSpacing = "8px";
+            tCtx.fillText("LIFE FOUR CUTS", targetCanvas.width / 2, targetCanvas.height - 80);
+            
+            const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+            tCtx.font = "300 16px 'Pretendard', sans-serif";
+            tCtx.letterSpacing = "2px";
+            tCtx.fillText(dateStr, targetCanvas.width / 2, targetCanvas.height - 40);
+          }
+        };
+        img.src = photos[photoIndex];
+      });
+    }
+
+    function moveToResult() {
+      const finalResultImg = document.getElementById('final-result-img');
+      finalResultImg.src = previewCanvas.toDataURL('image/png');
+      showScreen('screen-result');
+    }
+
+    function downloadImage() {
+      const a = document.createElement('a');
+      a.href = previewCanvas.toDataURL('image/png');
+      a.download = `Picture_${new Date().getTime()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function downloadVideo() {
+      if (!videoBlobUrl) return;
+      const a = document.createElement('a');
+      a.href = videoBlobUrl;
+      const ext = MediaRecorder.isTypeSupported('video/webm; codecs=vp8') ? 'webm' : 'mp4';
+      a.download = `Video_${new Date().getTime()}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  </script>
+</body>
+</html>
