@@ -391,13 +391,26 @@
 
     function startShootingProcess() {
       videoChunks = [];
-      const options = MediaRecorder.isTypeSupported('video/webm; codecs=vp8') 
-                      ? { mimeType: 'video/webm; codecs=vp8' } 
-                      : { mimeType: 'video/mp4' };
       
-      mediaRecorder = new MediaRecorder(stream, options);
+      // 모바일(특히 iOS) 호환성을 위해 MP4 코덱을 최우선으로 적용
+      let selectedMimeType = '';
+      if (MediaRecorder.isTypeSupported('video/mp4')) {
+        selectedMimeType = 'video/mp4';
+      } else if (MediaRecorder.isTypeSupported('video/webm; codecs=h264')) {
+        selectedMimeType = 'video/webm; codecs=h264';
+      } else {
+        selectedMimeType = 'video/webm; codecs=vp8';
+      }
+      
+      mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+      
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) videoChunks.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        const type = selectedMimeType.split(';')[0];
+        const blob = new Blob(videoChunks, { type: type });
+        videoBlobUrl = URL.createObjectURL(blob);
       };
       mediaRecorder.start();
 
@@ -556,27 +569,49 @@
         return;
       }
       
-      const type = MediaRecorder.isTypeSupported('video/webm; codecs=vp8') ? 'video/webm' : 'video/mp4';
-      const ext = type === 'video/webm' ? 'webm' : 'mp4';
+      // 녹화된 엔진 정보에 맞춰 정확한 MIME 타입과 확장자 추출
+      const recordedType = mediaRecorder.mimeType || 'video/mp4';
+      const cleanType = recordedType.split(';')[0];
+      const ext = cleanType.includes('mp4') ? 'mp4' : 'webm';
       const filename = `Video_${new Date().getTime()}.${ext}`;
-      const blob = new Blob(videoChunks, { type: type });
+      const blob = new Blob(videoChunks, { type: cleanType });
 
-      // 1. 모바일 환경 최우선 (Web Share API를 통한 비디오 저장/공유)
+      // 모바일 네이티브 공유 및 저장 창 호출
       if (navigator.share && navigator.canShare) {
-        const file = new File([blob], filename, { type: type });
+        const file = new File([blob], filename, { type: cleanType });
         if (navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
               files: [file],
-              title: '도니네컷 Timelapse'
+              title: 'Archive Timelapse'
             });
-            return; // 공유 창 띄우기 성공 시 종료
+            return; 
           } catch (err) {
             console.log("Share API 취소 또는 실패", err);
-            // 에러 발생 시 아래 일반 다운로드 로직으로 진행 (Fallback)
           }
         }
       }
+
+      // PC 브라우저 또는 Share API 실패 시 강제 다운로드
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      
+      const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: false
+      });
+      a.dispatchEvent(clickEvent);
+      
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    }
 
       // 2. PC 또는 Share API 미지원 환경용 강제 다운로드
       const url = URL.createObjectURL(blob);
