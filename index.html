@@ -344,6 +344,7 @@
     let stream;
     let mediaRecorder;
     let videoChunks = [];
+    let videoBlobUrl = null;
     let photos = []; 
     let selectedIndices = []; 
     let currentFrameColor = "#000000"; 
@@ -375,7 +376,7 @@
         try {
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         } catch (err2) {
-          alert("Camera access denied.");
+          alert("카메라 권한을 허용해주세요!");
           return;
         }
       }
@@ -392,7 +393,7 @@
     function startShootingProcess() {
       videoChunks = [];
       
-      // 모바일(특히 iOS) 호환성을 위해 MP4 코덱을 최우선으로 적용
+      // 모바일(iOS 등) 호환성을 위해 MP4 코덱을 최우선으로 지정
       let selectedMimeType = '';
       if (MediaRecorder.isTypeSupported('video/mp4')) {
         selectedMimeType = 'video/mp4';
@@ -407,11 +408,13 @@
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) videoChunks.push(e.data);
       };
+      
       mediaRecorder.onstop = () => {
         const type = selectedMimeType.split(';')[0];
         const blob = new Blob(videoChunks, { type: type });
         videoBlobUrl = URL.createObjectURL(blob);
       };
+      
       mediaRecorder.start();
 
       currentShot = 0;
@@ -535,7 +538,7 @@
             tCtx.font = "300 24px 'Pretendard', sans-serif";
             tCtx.textAlign = "center";
             tCtx.letterSpacing = "8px";
-            tCtx.fillText("도니네컷", targetCanvas.width / 2, targetCanvas.height - 80);
+            tCtx.fillText("LIFE FOUR CUTS", targetCanvas.width / 2, targetCanvas.height - 80);
             
             const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
             tCtx.font = "300 16px 'Pretendard', sans-serif";
@@ -562,14 +565,12 @@
       document.body.removeChild(a);
     }
 
-    // 모바일 지원을 위해 완전히 개편된 영상 다운로드/공유 로직
     async function downloadVideo() {
       if (!videoChunks || videoChunks.length === 0) {
         alert("영상 데이터가 없습니다.");
         return;
       }
       
-      // 녹화된 엔진 정보에 맞춰 정확한 MIME 타입과 확장자 추출
       const recordedType = mediaRecorder.mimeType || 'video/mp4';
       const cleanType = recordedType.split(';')[0];
       const ext = cleanType.includes('mp4') ? 'mp4' : 'webm';
@@ -592,28 +593,7 @@
         }
       }
 
-      // PC 브라우저 또는 Share API 실패 시 강제 다운로드
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      
-      const clickEvent = new MouseEvent('click', {
-        view: window,
-        bubbles: true,
-        cancelable: false
-      });
-      a.dispatchEvent(clickEvent);
-      
-      setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }, 100);
-    }
-
-      // 2. PC 또는 Share API 미지원 환경용 강제 다운로드
+      // PC 브라우저 또는 Share API 실패 시 다운로드 진행
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
