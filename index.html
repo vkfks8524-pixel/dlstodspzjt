@@ -108,6 +108,73 @@
       color: var(--bg-color);
     }
 
+    /* Mode Selection Cards */
+    .mode-cards {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 40px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .mode-card {
+      flex: 1;
+      border: 1px solid var(--border);
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .mode-card:hover {
+      border-color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateY(-5px);
+    }
+
+    .icon-1x4 {
+      display: grid;
+      grid-template-rows: repeat(4, 1fr);
+      gap: 3px;
+      width: 32px;
+      height: 96px;
+      margin-bottom: 24px;
+    }
+
+    .icon-2x2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 4px;
+      width: 64px;
+      height: 64px;
+      margin-top: 16px; 
+      margin-bottom: 40px;
+    }
+
+    .mode-card .box {
+      border: 1.5px solid #fff;
+      border-radius: 1px;
+    }
+
+    .mode-card h3 {
+      font-size: 1rem;
+      letter-spacing: 2px;
+      margin: 0 0 5px 0;
+      font-weight: 400;
+      text-transform: uppercase;
+    }
+
+    .mode-card p {
+      font-size: 0.7rem;
+      color: #888;
+      margin: 0;
+      letter-spacing: 1px;
+    }
+
     /* Camera Container */
     #video-container {
       position: relative;
@@ -206,8 +273,9 @@
 
     /* Live Preview Screen Specific */
     #preview-canvas-display {
-      max-width: 240px;
-      height: auto;
+      max-height: 45vh;
+      max-width: 100%;
+      width: auto;
       border: 1px solid var(--border);
       margin-bottom: 25px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.4);
@@ -264,7 +332,9 @@
 
     /* Final Result */
     #final-result-img {
-      max-width: 240px;
+      max-height: 45vh;
+      max-width: 100%;
+      width: auto;
       border: 1px solid var(--border);
       margin-bottom: 30px;
     }
@@ -283,7 +353,28 @@
   <div id="screen-start" class="screen active">
     <h1>도니네컷</h1>
     <p class="desc">Self Portrait Studio<br>10 Captures / 10 Sec Interval / Timelapse</p>
-    <button class="primary" onclick="initCamera()">Start Capture</button>
+    <button class="primary" onclick="showScreen('screen-mode')">Start Capture</button>
+  </div>
+
+  <div id="screen-mode" class="screen">
+    <h2>Select Layout Mode</h2>
+    <div class="mode-cards">
+      <div class="mode-card" onclick="selectLayoutMode('1x4')">
+        <div class="icon-1x4">
+          <div class="box"></div><div class="box"></div><div class="box"></div><div class="box"></div>
+        </div>
+        <h3>BASE</h3>
+        <p>1x4 Grid</p>
+      </div>
+      <div class="mode-card" onclick="selectLayoutMode('2x2')">
+        <div class="icon-2x2">
+          <div class="box"></div><div class="box"></div><div class="box"></div><div class="box"></div>
+        </div>
+        <h3>SPECIAL</h3>
+        <p>2x2 Grid</p>
+      </div>
+    </div>
+    <button onclick="showScreen('screen-start')">Back</button>
   </div>
 
   <div id="screen-camera" class="screen">
@@ -349,6 +440,7 @@
     let selectedIndices = []; 
     let currentFrameColor = "#000000"; 
     let isGrayscale = false; 
+    let selectedLayout = '1x4'; // '1x4' or '2x2' 선택된 레이아웃 모드
     
     let timerInterval;
     let currentShot = 0;
@@ -364,6 +456,12 @@
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById(id).classList.add('active');
+    }
+
+    // 모드 선택 후 카메라 초기화 실행
+    function selectLayoutMode(mode) {
+      selectedLayout = mode;
+      initCamera();
     }
 
     async function initCamera() {
@@ -393,7 +491,6 @@
     function startShootingProcess() {
       videoChunks = [];
       
-      // 모바일(iOS 등) 호환성을 위해 MP4 코덱을 최우선으로 지정
       let selectedMimeType = '';
       if (MediaRecorder.isTypeSupported('video/mp4')) {
         selectedMimeType = 'video/mp4';
@@ -507,6 +604,7 @@
       renderStrip(previewCanvas, currentFrameColor);
     }
 
+    // 레이아웃 모드(1x4 or 2x2)에 따른 프레임 렌더링 로직 통합
     function renderStrip(targetCanvas, bgColor) {
       const tCtx = targetCanvas.getContext('2d');
       const padding = 40;
@@ -516,8 +614,13 @@
       const pWidth = 600; 
       const pHeight = parseInt(canvasEl.height * (pWidth / canvasEl.width)); 
 
-      targetCanvas.width = pWidth + (padding * 2);
-      targetCanvas.height = padding + (pHeight * 4) + (spacing * 3) + bottomSpace;
+      if (selectedLayout === '1x4') {
+        targetCanvas.width = pWidth + (padding * 2);
+        targetCanvas.height = padding + (pHeight * 4) + (spacing * 3) + bottomSpace;
+      } else {
+        targetCanvas.width = (pWidth * 2) + (padding * 2) + spacing;
+        targetCanvas.height = padding + (pHeight * 2) + spacing + bottomSpace;
+      }
 
       tCtx.fillStyle = bgColor;
       tCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
@@ -526,10 +629,21 @@
       selectedIndices.forEach((photoIndex, i) => {
         const img = new Image();
         img.onload = () => {
-          const yPos = padding + (i * (pHeight + spacing));
+          let xPos, yPos;
+          
+          if (selectedLayout === '1x4') {
+            xPos = padding;
+            yPos = padding + (i * (pHeight + spacing));
+          } else {
+            // 2x2 레이아웃의 좌표 계산
+            const row = Math.floor(i / 2);
+            const col = i % 2;
+            xPos = padding + (col * (pWidth + spacing));
+            yPos = padding + (row * (pHeight + spacing));
+          }
           
           tCtx.filter = isGrayscale ? 'grayscale(100%)' : 'none';
-          tCtx.drawImage(img, padding, yPos, pWidth, pHeight);
+          tCtx.drawImage(img, xPos, yPos, pWidth, pHeight);
           tCtx.filter = 'none'; 
           
           loadedCount++;
@@ -577,7 +691,6 @@
       const filename = `Video_${new Date().getTime()}.${ext}`;
       const blob = new Blob(videoChunks, { type: cleanType });
 
-      // 모바일 네이티브 공유 및 저장 창 호출
       if (navigator.share && navigator.canShare) {
         const file = new File([blob], filename, { type: cleanType });
         if (navigator.canShare({ files: [file] })) {
@@ -593,7 +706,6 @@
         }
       }
 
-      // PC 브라우저 또는 Share API 실패 시 다운로드 진행
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
