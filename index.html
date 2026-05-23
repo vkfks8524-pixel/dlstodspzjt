@@ -166,7 +166,7 @@
 
     #countdown {
       position: absolute;
-      top: 15px; /* 타이머 상단으로 조정 */
+      top: 15px; 
       left: 50%;
       transform: translateX(-50%);
       font-size: 5rem;
@@ -186,7 +186,6 @@
       margin-bottom: 40px;
     }
 
-    /* 갤러리 기본 컬러 및 투명도 100% */
     .gallery img {
       width: 100%;
       aspect-ratio: 3/4;
@@ -199,7 +198,6 @@
       box-sizing: border-box;
     }
 
-    /* 선택된 이미지만 시각적 강조 */
     .gallery img.selected {
       border-color: var(--accent);
       transform: scale(0.95);
@@ -324,8 +322,8 @@
     <div class="color-swatch-container">
       <div class="color-swatch" style="background: #000000;" onclick="updatePreviewColor('#000000')"></div>
       <div class="color-swatch" style="background: #ffffff;" onclick="updatePreviewColor('#ffffff')"></div>
-      <div class="color-swatch" style="background: #e5e5e5;" onclick="updatePreviewColor('#e5e5e5')"></div>
-      <div class="color-swatch" style="background: #1a1a1a;" onclick="updatePreviewColor('#1a1a1a')"></div>
+      <div class="color-swatch" style="background: #FFF2CC;" onclick="updatePreviewColor('#FFF2CC')"></div>
+      <div class="color-swatch" style="background: #FFD1DC;" onclick="updatePreviewColor('#FFD1DC')"></div>
     </div>
 
     <button class="primary" onclick="moveToResult()">Finalize</button>
@@ -346,11 +344,10 @@
     let stream;
     let mediaRecorder;
     let videoChunks = [];
-    let videoBlobUrl = null;
     let photos = []; 
     let selectedIndices = []; 
     let currentFrameColor = "#000000"; 
-    let isGrayscale = false; // 흑백 필터 상태 관리
+    let isGrayscale = false; 
     
     let timerInterval;
     let currentShot = 0;
@@ -401,11 +398,6 @@
       mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) videoChunks.push(e.data);
-      };
-      mediaRecorder.onstop = () => {
-        const type = options.mimeType.split(';')[0];
-        const blob = new Blob(videoChunks, { type: type });
-        videoBlobUrl = URL.createObjectURL(blob);
       };
       mediaRecorder.start();
 
@@ -482,19 +474,16 @@
       document.getElementById('btn-confirm-select').disabled = (selectedIndices.length !== 4);
     }
 
-    // 프리뷰 화면으로 이동
     function moveToPreview() {
       showScreen('screen-preview');
       renderStrip(previewCanvas, currentFrameColor);
     }
 
-    // 배경색 전환
     function updatePreviewColor(color) {
       currentFrameColor = color;
       renderStrip(previewCanvas, color);
     }
 
-    // 흑백/컬러 필터 전환 함수
     function updatePreviewFilter(grayscale) {
       isGrayscale = grayscale;
       document.getElementById('btn-filter-color').classList.toggle('active', !isGrayscale);
@@ -502,7 +491,6 @@
       renderStrip(previewCanvas, currentFrameColor);
     }
 
-    // 캔버스 프레임 렌더링 함수
     function renderStrip(targetCanvas, bgColor) {
       const tCtx = targetCanvas.getContext('2d');
       const padding = 40;
@@ -515,7 +503,6 @@
       targetCanvas.width = pWidth + (padding * 2);
       targetCanvas.height = padding + (pHeight * 4) + (spacing * 3) + bottomSpace;
 
-      // 프레임 배경 칠하기
       tCtx.fillStyle = bgColor;
       tCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
 
@@ -525,15 +512,13 @@
         img.onload = () => {
           const yPos = padding + (i * (pHeight + spacing));
           
-          // 사진 렌더링 시 흑백/컬러 필터 적용
           tCtx.filter = isGrayscale ? 'grayscale(100%)' : 'none';
           tCtx.drawImage(img, padding, yPos, pWidth, pHeight);
-          tCtx.filter = 'none'; // 프레임 텍스트에 영향 안 가도록 초기화
+          tCtx.filter = 'none'; 
           
           loadedCount++;
           if (loadedCount === 4) {
-            // 하단 텍스트 디자인
-            tCtx.fillStyle = (bgColor === '#000000' || bgColor === '#1a1a1a') ? '#ffffff' : '#000000';
+            tCtx.fillStyle = (bgColor === '#000000') ? '#ffffff' : '#000000';
             tCtx.font = "300 24px 'Pretendard', sans-serif";
             tCtx.textAlign = "center";
             tCtx.letterSpacing = "8px";
@@ -564,15 +549,54 @@
       document.body.removeChild(a);
     }
 
-    function downloadVideo() {
-      if (!videoBlobUrl) return;
+    // 모바일 지원을 위해 완전히 개편된 영상 다운로드/공유 로직
+    async function downloadVideo() {
+      if (!videoChunks || videoChunks.length === 0) {
+        alert("영상 데이터가 없습니다.");
+        return;
+      }
+      
+      const type = MediaRecorder.isTypeSupported('video/webm; codecs=vp8') ? 'video/webm' : 'video/mp4';
+      const ext = type === 'video/webm' ? 'webm' : 'mp4';
+      const filename = `Video_${new Date().getTime()}.${ext}`;
+      const blob = new Blob(videoChunks, { type: type });
+
+      // 1. 모바일 환경 최우선 (Web Share API를 통한 비디오 저장/공유)
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], filename, { type: type });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: '도니네컷 Timelapse'
+            });
+            return; // 공유 창 띄우기 성공 시 종료
+          } catch (err) {
+            console.log("Share API 취소 또는 실패", err);
+            // 에러 발생 시 아래 일반 다운로드 로직으로 진행 (Fallback)
+          }
+        }
+      }
+
+      // 2. PC 또는 Share API 미지원 환경용 강제 다운로드
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = videoBlobUrl;
-      const ext = MediaRecorder.isTypeSupported('video/webm; codecs=vp8') ? 'webm' : 'mp4';
-      a.download = `Video_${new Date().getTime()}.${ext}`;
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
       document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      
+      const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: false
+      });
+      a.dispatchEvent(clickEvent);
+      
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
     }
   </script>
 </body>
