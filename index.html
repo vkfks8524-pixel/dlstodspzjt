@@ -435,12 +435,11 @@
     let stream;
     let mediaRecorder;
     let videoChunks = [];
-    let videoBlobUrl = null;
     let photos = []; 
     let selectedIndices = []; 
     let currentFrameColor = "#000000"; 
     let isGrayscale = false; 
-    let selectedLayout = '1x4'; // '1x4' or '2x2' 선택된 레이아웃 모드
+    let selectedLayout = '1x4'; 
     
     let timerInterval;
     let currentShot = 0;
@@ -458,7 +457,6 @@
       document.getElementById(id).classList.add('active');
     }
 
-    // 모드 선택 후 카메라 초기화 실행
     function selectLayoutMode(mode) {
       selectedLayout = mode;
       initCamera();
@@ -507,9 +505,7 @@
       };
       
       mediaRecorder.onstop = () => {
-        const type = selectedMimeType.split(';')[0];
-        const blob = new Blob(videoChunks, { type: type });
-        videoBlobUrl = URL.createObjectURL(blob);
+        // Blob 데이터 생성은 다운로드 시점에 수행
       };
       
       mediaRecorder.start();
@@ -604,7 +600,6 @@
       renderStrip(previewCanvas, currentFrameColor);
     }
 
-    // 레이아웃 모드(1x4 or 2x2)에 따른 프레임 렌더링 로직 통합
     function renderStrip(targetCanvas, bgColor) {
       const tCtx = targetCanvas.getContext('2d');
       const padding = 40;
@@ -635,7 +630,6 @@
             xPos = padding;
             yPos = padding + (i * (pHeight + spacing));
           } else {
-            // 2x2 레이아웃의 좌표 계산
             const row = Math.floor(i / 2);
             const col = i % 2;
             xPos = padding + (col * (pWidth + spacing));
@@ -652,7 +646,7 @@
             tCtx.font = "300 24px 'Pretendard', sans-serif";
             tCtx.textAlign = "center";
             tCtx.letterSpacing = "8px";
-            tCtx.fillText("LIFE FOUR CUTS", targetCanvas.width / 2, targetCanvas.height - 80);
+            tCtx.fillText("도니네컷", targetCanvas.width / 2, targetCanvas.height - 80);
             
             const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
             tCtx.font = "300 16px 'Pretendard', sans-serif";
@@ -679,9 +673,10 @@
       document.body.removeChild(a);
     }
 
+    // 영상 다운로드 로직 (PC는 즉시 다운로드, 모바일은 공유창 + 폴백)
     async function downloadVideo() {
       if (!videoChunks || videoChunks.length === 0) {
-        alert("영상 데이터가 없습니다.");
+        alert("영상 데이터가 아직 처리되지 않았습니다.");
         return;
       }
       
@@ -690,40 +685,53 @@
       const ext = cleanType.includes('mp4') ? 'mp4' : 'webm';
       const filename = `Video_${new Date().getTime()}.${ext}`;
       const blob = new Blob(videoChunks, { type: cleanType });
+      const url = URL.createObjectURL(blob);
 
-      if (navigator.share && navigator.canShare) {
-        const file = new File([blob], filename, { type: cleanType });
-        if (navigator.canShare({ files: [file] })) {
+      // 모바일 기기 감지 (iOS, Android 등)
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // 1. 모바일: Web Share API 시도
+        if (navigator.share && navigator.canShare) {
+          const file = new File([blob], filename, { type: cleanType });
           try {
             await navigator.share({
               files: [file],
               title: 'Archive Timelapse'
             });
-            return; 
+            return; // 공유 성공 시 함수 종료
           } catch (err) {
-            console.log("Share API 취소 또는 실패", err);
+            console.log("공유 창 닫힘 또는 지원 불가", err);
           }
         }
-      }
+        
+        // 2. 모바일 폴백: Share API 실패 시 강제 다운로드 시도
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 100);
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      
-      const clickEvent = new MouseEvent('click', {
-        view: window,
-        bubbles: true,
-        cancelable: false
-      });
-      a.dispatchEvent(clickEvent);
-      
-      setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }, 100);
+      } else {
+        // 3. 데스크톱(PC): 공유창 없이 무조건 즉시 다운로드
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 100);
+      }
     }
   </script>
 </body>
